@@ -23,8 +23,8 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 router.post('/signup', upload.single('image'), async (req, res) => {
-  const { fullname, username, password } = req.body;
-  const image = req.file ? req.file.path : null; // Save the file path to the database
+  const { fullname, username, password, role } = req.body;
+  const image = req.file ? req.file.path : null;
 
   try {
     const existingUser = await User.findOne({ username });
@@ -32,7 +32,7 @@ router.post('/signup', upload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'Username already exists' });
     }
 
-    const newUser = new User({ fullname, username, password, image });
+    const newUser = new User({ fullname, username, password, image, role: role || 'user' }); // Default to 'user' if no role provided
     await newUser.save();
     res.status(201).json({ message: 'User created successfully' });
   } catch (error) {
@@ -49,10 +49,111 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    res.status(200).json({ message: 'Login successful', user });
+    res.status(200).json({ message: 'Login successful', user: { ...user._doc, role: user.role } });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
 });
+router.get('/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.status(200).json(user);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/:id', async (req, res) => { // Change '/api/auth/:id' to '/api/user/:id'
+  try {
+    const { id } = req.params;
+    const updatedUser = await User.findByIdAndUpdate(id, req.body, { new: true });
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User updated successfully", updatedUser });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
+const bcrypt = require('bcrypt');
+
+// Change Password
+router.put('/change-password/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { oldPassword, newPassword } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Check if old password is correct
+    const isMatch = user.password === oldPassword; // Replace with bcrypt compare if hashed
+    if (!isMatch) return res.status(400).json({ message: 'Incorrect old password' });
+
+    // Update password
+    user.password = newPassword; // Hash it before saving
+    await user.save();
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
+  }
+});
+// Fetch all users
+router.get('/', async (req, res) => {
+  try {
+    const users = await User.find(); 
+    res.status(200).json(users); 
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// userRoutes.js
+
+router.get('/role-count', async (req, res) => {
+  try {
+    const result = await User.aggregate([
+      {
+        $group: {
+          _id: "$role",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    console.log(result);  // Add logging to inspect the result
+
+    const roleCounts = {
+      admin: 0,
+      user: 0,
+      recruiter: 0
+    };
+
+    result.forEach(item => {
+      const role = item._id?.toLowerCase();
+      if (roleCounts.hasOwnProperty(role)) {
+        roleCounts[role] = item.count;
+      }
+    });
+
+    res.status(200).json(roleCounts);
+  } catch (error) {
+    console.error('Error fetching role counts:', error.message);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+
+
+
+
+
 
 module.exports = router;
