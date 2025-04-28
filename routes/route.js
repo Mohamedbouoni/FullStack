@@ -4,7 +4,7 @@ const User = require('../models/userSchema');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-
+const Employee = require('../models/Employee');
 // Ensure the 'uploads' directory exists
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -127,7 +127,7 @@ router.get('/role-count', async (req, res) => {
       }
     ]);
 
-    console.log(result);  // Add logging to inspect the result
+    console.log(result);  
 
     const roleCounts = {
       admin: 0,
@@ -149,11 +149,58 @@ router.get('/role-count', async (req, res) => {
   }
 });
 
+router.post("/add-user", upload.single('image'), async (req, res) => {
+  const { fullname, username, password, role } = req.body;
+  const image = req.file ? req.file.path : null;
+
+  try {
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Username already exists' });
+    }
+
+    const newUser = new User({ fullname, username, password, image, role: role || 'user' }); // Default to 'user' if no role provided
+    await newUser.save();
+    res.status(201).json({ message: 'User created successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 
 
+router.delete('/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const deletedUser = await User.findByIdAndDelete(userId);
+    if (!deletedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+router.put('/change-role/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedUser = await User.findByIdAndUpdate(id, req.body, { new: true });
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User updated successfully", updatedUser });
+  } catch (error) {'('
+    res.status(500).json({ message: "Server error", error });
+  }
+});
 
 
+ 
 
 
 module.exports = router;

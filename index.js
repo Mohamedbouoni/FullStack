@@ -4,7 +4,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const User = require("./models/userSchema");
 const path=require("path")
-
+const employeeRoutes  = require("./routes/routeEmployees");
 dotenv.config();
 
 const app = express();
@@ -23,7 +23,9 @@ mongoose.connect("mongodb+srv://linkous:pyezA6rVCfMgysOZ@cluster0.pxssh1m.mongod
 
 // Routes
 app.use('/api/user', require('./routes/route'));
-
+app.use('/api/employees', employeeRoutes);
+app.use('/api',require('./routes/roleStatsRoute'))
+app.use('/api', require('./routes/jobs'));
 
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
